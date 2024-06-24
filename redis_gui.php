@@ -65,6 +65,27 @@ if(isset($_GET['act'])){
 }
 $list = $redis->keys($query);
 sort($list);
+
+// 使用 pipeline 提高性能
+$redis->multi(Redis::PIPELINE);
+
+// 發送 STRLEN 和 TTL 命令來獲取每個 key 的值長度和 TTL
+foreach ($list as $key) {
+    $redis->strlen($key);
+    $redis->ttl($key);
+}
+
+// 獲取所有結果
+$responses = $redis->exec();
+
+// 將結果整合到一個數組中
+$results = [];
+foreach ($list as $index => $key) {
+    $results[$key] = [
+        'length' => $responses[$index * 2],
+        'ttl' => $responses[$index * 2 + 1],
+    ];
+}
 ?>
 <!DOCTYPE html>
 <html data-bs-theme="dark">
@@ -98,7 +119,7 @@ sort($list);
             <div class="col-5"><?=$v ?></div>
             <div class="col-3">
                 <a class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#cache<?=$k?>">view raw</a>
-                len: <?=$redis->strlen($v)?>
+                len: <?=$results[$v]['length'] ?>
                 <div class="modal fade" id="cache<?=$k?>" tabindex="-1" aria-hidden="true">
                     <div class="modal-dialog modal-dialog-scrollable modal-xl">
                         <div class="modal-content">
@@ -116,7 +137,7 @@ sort($list);
                     </div>
                 </div>
             </div>
-            <div class="col-3"><?=$redis->TTL($v) ?></div>
+            <div class="col-3"><?=$results[$v]['ttl'] ?></div>
             <div class="col-1"><a href="<?="?act=delete&key=$v&host=$host&port=$port"?>" class="btn btn-sm btn-danger">Delete</a></div>
         </div>
         <?php endforeach; ?>
