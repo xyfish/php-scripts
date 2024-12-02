@@ -6,9 +6,9 @@ $port = !empty($_GET['port']) ? $_GET['port'] : 11211;
 try{
     $memcache = memcache_connect($host, $port);
     if(empty($memcache)) throw new Exception('connection refused');
-    // $memcache = new Memcached();
-    // $memcache->addServer($host, $port);
-    // $list = $memcache->getAllKeys();
+    // $memcached = new Memcached();
+    // $memcached->addServer($host, $port);
+    // $list = $memcached->getAllKeys();
 }catch(Exception $e){
     echo '<style>:root { color-scheme: dark;}</style><pre>';
     echo "Exception:\n## {$e->getFile()}({$e->getLine()}): {$e->getMessage()}\n{$e->getTraceAsString()}\n";
@@ -57,7 +57,29 @@ if(isset($_GET['act'])){
         if(isset($_GET['key'])){
             echo '<style>:root { color-scheme: dark;}</style><pre>';
             $tmp = $memcache->get($_GET['key']);
-            var_dump($tmp);
+            $format = @$_GET['format'];
+            if($format == 'var_dump' || empty($format)){
+                var_dump($tmp);
+                exit;
+            }
+            if($format == 'json'){
+                $decode = json_decode($tmp);
+                if($decode !== null) {
+                    echo "Format to json:\n\n".json_encode($decode, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+                    exit;
+                }
+                echo "json_decode result null\n\n";
+            }
+            if($format == 'unserialize'){
+                echo "Format to unserialize:\n\n";
+                $decode = unserialize($tmp);
+                if($decode !== false){
+                    var_dump($decode);
+                    exit;
+                }
+                echo "unserialize result false\n\n";
+            }
+            echo "Raw text:\n\n$tmp";
             exit;
         }
         break;
@@ -105,7 +127,10 @@ sort($list);
                                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                             </div>
                             <div class="modal-body">
-                                <iframe src="?act=get&key=<?=$v['key']?>&host=<?=$host?>&port=<?=$port?>" frameborder="0" style="width:100%; height: 80vh;" loading="lazy"></iframe>
+                                <?php $src="?act=get&key={$v['key']}&host=$host&port=$port"; $formats=['var_dump','json','unserialize']; foreach($formats as $f): ?>
+                                <a class="btn btn-primary btn-sm" href="<?="$src&format=$f"?>" target="iframe_<?=$k?>"><?=$f?></a>
+                                <?php endforeach; ?>
+                                <iframe name="iframe_<?=$k?>" src="<?=$src?>" frameborder="0" style="width:100%; height: 80vh;" loading="lazy"></iframe>
                             </div>
                         </div>
                     </div>
